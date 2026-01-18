@@ -24,29 +24,25 @@ let storyCompleted = false;
 // --- 語音控制 ---
 let speechQueue = [];
 let speaking = false;
-let currentUtterance; // 新增全域變數，防止手機版語音被記憶體回收機制中斷
+let currentUtterance; 
 //夜間開放//
 let libraryOpen = false;
 let bgLayer;
 
 function checkLibraryTime() {
   const now = new Date();
-  const hour = now.getHours(); // 0–23
-
-  // 18:00 – 24:00 或 00:00 – 06:00
-  libraryOpen = (hour >= 18 || hour < 12);
+  const hour = now.getHours(); 
+  libraryOpen = (hour >= 18 || hour < 6);
 }
 
 // --- Supabase 設定 ---
 const SUPABASE_URL = "https://klqeceqwhnxpzdujonrl.supabase.co";
 const SUPABASE_KEY = "sb_publishable_emeCCYsPI3pjoKvZYux2_g_O6sSrfgh";
 
-
 // =================== p5.js setup ===================
 function setup() {
   checkLibraryTime();
   createCanvas(windowWidth, windowHeight);
-  // 👇 禁止手機滑動滾動
   document.body.addEventListener("touchmove", e => e.preventDefault(), { passive: false });
 
   document.body.style.margin = "0";
@@ -63,24 +59,21 @@ function setup() {
 
   showCategoryOverlay();
 
-  // 勇氣UI
   let panelSize = min(windowWidth, windowHeight) * 0.35;
-
   courageDiv = createDiv('');
   courageDiv.style(`
-  position: fixed;
-  bottom: ${panelSize * 0.25}px;
-  right: 20px;
-  background: rgba(0,0,0,0.7);
-  color: white;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: ${panelSize * 0.08}px;
-  width: ${panelSize}px;
-  display: block;
-  z-index:999;
-`);
-
+    position: fixed;
+    bottom: ${panelSize * 0.25}px;
+    right: 20px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: ${panelSize * 0.08}px;
+    width: ${panelSize}px;
+    display: block;
+    z-index:999;
+  `);
   updateCourageBar();
 
   toggleBtn = createButton("❤️‍🩹");
@@ -178,16 +171,10 @@ function draw() {
 // =================== 主選單 Overlay ===================
 function showCategoryOverlay() {
   checkLibraryTime();
-  
-  // 如果已經存在 overlay 則先移除，避免重複
   if (overlay) overlay.remove();
-  
   overlay = createDiv('');
-  
-  // 背景圖片連結
   const bgImg = "https://res.cloudinary.com/dsxqqe6na/image/upload/v1768706628/tlof_bg_s_01_twmlns.jpg";
 
-  // 優化樣式寫法，確保在 Live Server 環境下生效
   overlay.style('position', 'fixed');
   overlay.style('top', '0');
   overlay.style('left', '0');
@@ -198,8 +185,6 @@ function showCategoryOverlay() {
   overlay.style('justify-content', 'center');
   overlay.style('align-items', 'center');
   overlay.style('z-index', '1000');
-  
-  // 背景圖與毛玻璃效果
   overlay.style('background-image', `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("${bgImg}")`);
   overlay.style('background-size', 'cover');
   overlay.style('background-position', 'center');
@@ -208,18 +193,9 @@ function showCategoryOverlay() {
   overlay.style('-webkit-backdrop-filter', 'blur(4px)');
   overlay.style('font-family', 'Georgia, serif');
 
-  let titleText = libraryOpen
-    ? '歡迎來到失敗圖書館'
-    : '失敗圖書館只在夜間18:00 - 06:00間開放';
+  let titleText = libraryOpen ? '歡迎來到失敗圖書館' : '失敗圖書館只在夜間18:00 - 06:00間開放';
   let title = createP(titleText);
-  title.style(`
-    color: white;
-    font-size: 28px;
-    margin-bottom: 30px;
-    text-align: center;
-    text-shadow: 2px 2px 10px rgba(0,0,0,0.8);
-    padding: 0 20px;
-  `);
+  title.style('color:white; font-size:28px; margin-bottom:30px; text-align:center; text-shadow:2px 2px 10px rgba(0,0,0,0.8); padding:0 20px;');
   overlay.child(title);
 
   let readBtn = createButton('朗讀');
@@ -229,9 +205,7 @@ function showCategoryOverlay() {
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         let wakeUp = new SpeechSynthesisUtterance("正在連結失敗圖書館資料庫"); 
-        wakeUp.volume = 0.5; 
-        wakeUp.lang = "zh-TW";
-        wakeUp.rate = 1;
+        wakeUp.volume = 0.5; wakeUp.lang = "zh-TW"; wakeUp.rate = 1;
         window.speechSynthesis.speak(wakeUp);
       }
       fetchRandomStory();
@@ -260,10 +234,7 @@ function showCategoryOverlay() {
 // =================== Supabase 讀取故事 ===================
 function fetchRandomStory() {
   fetch(`${SUPABASE_URL}/rest/v1/stories?select=text,score`, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: "Bearer " + SUPABASE_KEY
-    }
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
   })
     .then(res => res.json())
     .then(rows => {
@@ -283,9 +254,20 @@ function fetchRandomStory() {
     });
 }
 
-// =================== Glitch 語音 ===================
+// =================== 語音處理優化 (逐句 Glitch) ===================
 function startGlitchSpeech() {
-  speechQueue = letters.split("");
+  // 使用 RegEx 按標點符號進行「逐句」拆分
+  // 匹配：句號、問號、驚嘆號 (全形與半形)
+  speechQueue = letters.split(/([。？！.?!])/).reduce((acc, curr, idx) => {
+    if (idx % 2 === 0) {
+      acc.push(curr);
+    } else {
+      // 將標點符號接回前一句
+      if (acc.length > 0) acc[acc.length - 1] += curr;
+    }
+    return acc;
+  }, []).filter(s => s.trim().length > 0);
+
   speakNextGlitchChar();
 }
 
@@ -297,23 +279,28 @@ function speakNextGlitchChar() {
     }
     return;
   }
-  let charToSpeak = speechQueue.shift();
-  if (charToSpeak === " ") {
-    speakNextGlitchChar();
-    return;
+  
+  let sentenceToSpeak = speechQueue.shift();
+  currentUtterance = new SpeechSynthesisUtterance(sentenceToSpeak);
+  
+  // 自動偵測該句語言
+  if (/[a-zA-Z]/.test(sentenceToSpeak)) {
+    currentUtterance.lang = "en-US";
+  } else {
+    currentUtterance.lang = "zh-TW";
   }
-  currentUtterance = new SpeechSynthesisUtterance(charToSpeak);
-  currentUtterance.lang = "zh-TW";
-  currentUtterance.rate = 1.1 + random(-0.1, 0.25);
-  currentUtterance.pitch = 1 + random(-0.8, 0.8);
+
+  // 即使是逐句，我們依然加入輕微的隨機性，營造「圖書館系統不穩定」的氛圍
+  currentUtterance.rate = 1.0 + random(-0.5, 0.15);
+  currentUtterance.pitch = 1.0 + random(-0.9, 0.1);
   currentUtterance.volume = 1;
-  currentUtterance.onend = () => {
-    speakNextGlitchChar();
-  };
+  
+  currentUtterance.onend = () => speakNextGlitchChar();
+  
   window.speechSynthesis.speak(currentUtterance);
 }
 
-// =================== 投稿表單 ===================
+// =================== 其餘功能 (投稿、勇氣、重置) ===================
 function showSubmissionForm() {
   if (submissionOverlay) return;
   submissionOverlay = createDiv('');
@@ -321,42 +308,16 @@ function showSubmissionForm() {
   let formSize = min(windowWidth, windowHeight) * 0.05;
 
   formOverlay.style(`
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    width: 80%;
-    max-width: 800px;
-    min-height: 300px;
-    transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.92);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    font-family: 'Georgia', serif;
-    color: white;
-    border: 1px solid rgba(255,255,255,0.25);
-    border-radius: 12px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-    z-index: 1100;
+    position: fixed; top: 50%; left: 50%; width: 80%; max-width: 800px; min-height: 300px;
+    transform: translate(-50%, -50%); background: rgba(0,0,0,0.92); display: flex;
+    flex-direction: column; justify-content: center; align-items: center;
+    font-family: 'Georgia', serif; color: white; border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); z-index: 1100;
   `);
 
   let closeBtn = createButton("×");
-  closeBtn.style(`
-    position:absolute;
-    top:10px;
-    right:10px;
-    background:transparent;
-    color:white;
-    border:none;
-    cursor:pointer;
-    font-size:${formSize * 1.5}px;
-    line-height:1;
-  `);
-  closeBtn.mousePressed(() => {
-    formOverlay.remove();
-    submissionOverlay = null;
-  });
+  closeBtn.style(`position:absolute; top:10px; right:10px; background:transparent; color:white; border:none; cursor:pointer; font-size:${formSize * 1.5}px; line-height:1;`);
+  closeBtn.mousePressed(() => { formOverlay.remove(); submissionOverlay = null; });
   formOverlay.child(closeBtn);
 
   let textarea = createElement("textarea");
@@ -377,35 +338,19 @@ function showSubmissionForm() {
     if (!textVal || isNaN(scoreVal)) return;
     fetch(`${SUPABASE_URL}/rest/v1/stories`, {
       method: "POST",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: "Bearer " + SUPABASE_KEY,
-        "Content-Type": "application/json"
-      },
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ text: textVal, score: scoreVal })
-    }).then(() => {
-      closeSubmissionForm();
-    });
+    }).then(() => closeSubmissionForm());
   });
   formOverlay.child(submit);
 }
 
 function closeSubmissionForm() {
-  if (submissionOverlay) {
-    submissionOverlay.remove();
-    submissionOverlay = null;
-  }
+  if (submissionOverlay) { submissionOverlay.remove(); submissionOverlay = null; }
 }
 
 function buttonStyle() {
-  return `
-    margin:10px; padding:12px 25px;
-    font-size:18px; color:white;
-    background: rgba(0,0,0,0.4); border:2px solid white;
-    border-radius:5px; cursor:pointer;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
-    transition: background 0.3s;
-  `;
+  return `margin:10px; padding:12px 25px; font-size:18px; color:white; background: rgba(0,0,0,0.4); border:2px solid white; border-radius:5px; cursor:pointer; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); transition: background 0.3s;`;
 }
 
 function addCourage() {
@@ -430,14 +375,8 @@ function updateCourageBar() {
 }
 
 function resetToMainMenu() {
-  if (submissionOverlay) {
-    submissionOverlay.remove();
-    submissionOverlay = null;
-  }
-  if (overlay) {
-    overlay.remove();
-    overlay = null;
-  }
+  if (submissionOverlay) { submissionOverlay.remove(); submissionOverlay = null; }
+  if (overlay) { overlay.remove(); overlay = null; }
   speechSynthesis.cancel();
   categoryChosen = false;
   counter = 0;
@@ -446,6 +385,4 @@ function resetToMainMenu() {
   showCategoryOverlay();
 }
 
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
