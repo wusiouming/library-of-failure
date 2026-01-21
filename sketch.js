@@ -9,6 +9,7 @@ let angleDistortion = 0;
 let categoryChosen = false;
 let overlay;
 let backBtn;
+let nextBtn; // 新增：播放下一個按鈕
 let submissionOverlay = null;
 
 // --- 勇氣系統 ---
@@ -93,16 +94,29 @@ function setup() {
     position: fixed; bottom: env(safe-area-inset-bottom, 20px); right: 80px;
     font-size:22px; background: rgb(0,0,0);
     border: 2px solid white; border-radius: 8px; padding:5px 10px;
-    cursor:pointer; z-index:999;
+    cursor:pointer; z-index:999; display: none;
   `);
   backBtn.mousePressed(() => resetToMainMenu());
+
+  // 新增：下一個故事按鈕
+  nextBtn = createButton("⏩");
+  nextBtn.style(`
+    position: fixed; bottom: env(safe-area-inset-bottom, 20px);
+    font-size:22px; background: rgb(0,0,0);
+    border: 2px solid white; border-radius: 8px; padding:5px 10px;
+    cursor:pointer; z-index:999; display: none;
+  `);
+  nextBtn.mousePressed(() => playNextStory());
 
   let uiSize = min(windowWidth, windowHeight) * 0.05;
   toggleBtn.style(`font-size:${uiSize}px;`);
   backBtn.style(`font-size:${uiSize}px;`);
+  nextBtn.style(`font-size:${uiSize}px;`);
+  
   let gap = uiSize * 2.2;
   toggleBtn.style(`right:20px;`);
   backBtn.style(`right:${20 + gap}px;`);
+  nextBtn.style(`right:${20 + gap * 2}px;`);
 }
 
 function drawLibraryWindows(pg) {
@@ -172,6 +186,11 @@ function draw() {
 function showCategoryOverlay() {
   checkLibraryTime();
   if (overlay) overlay.remove();
+  
+  // 隱藏遊戲中的按鈕
+  if(backBtn) backBtn.style('display', 'none');
+  if(nextBtn) nextBtn.style('display', 'none');
+  
   overlay = createDiv('');
   const bgImg = "https://res.cloudinary.com/dsxqqe6na/image/upload/v1768706628/tlof_bg_s_01_twmlns.jpg";
 
@@ -248,21 +267,31 @@ function fetchRandomStory() {
       counter = 0;
       x = width / 2;
       y = height / 2;
+      background(0); // 清除畫布迎接新故事
+      image(bgLayer, 0, 0);
+      
       overlay.remove();
       courageDiv.style("display", "block");
+      backBtn.style('display', 'block');
+      nextBtn.style('display', 'block');
+      
       startGlitchSpeech();
     });
 }
 
+// =================== 新增：播放下一個功能 ===================
+function playNextStory() {
+  window.speechSynthesis.cancel();
+  storyCompleted = false;
+  fetchRandomStory();
+}
+
 // =================== 語音處理優化 (逐句 Glitch) ===================
 function startGlitchSpeech() {
-  // 使用 RegEx 按標點符號進行「逐句」拆分
-  // 匹配：句號、問號、驚嘆號 (全形與半形)
   speechQueue = letters.split(/([。？！.?!])/).reduce((acc, curr, idx) => {
     if (idx % 2 === 0) {
       acc.push(curr);
     } else {
-      // 將標點符號接回前一句
       if (acc.length > 0) acc[acc.length - 1] += curr;
     }
     return acc;
@@ -283,16 +312,14 @@ function speakNextGlitchChar() {
   let sentenceToSpeak = speechQueue.shift();
   currentUtterance = new SpeechSynthesisUtterance(sentenceToSpeak);
   
-  // 自動偵測該句語言
   if (/[a-zA-Z]/.test(sentenceToSpeak)) {
     currentUtterance.lang = "en-US";
   } else {
     currentUtterance.lang = "zh-TW";
   }
 
-  // 即使是逐句，我們依然加入輕微的隨機性，營造「圖書館系統不穩定」的氛圍
-  currentUtterance.rate = 1.0 + random(-0.5, 0.15);
-  currentUtterance.pitch = 1.0 + random(-0.9, 0.1);
+  currentUtterance.rate = 1.0 + random(-0.15, 0.15);
+  currentUtterance.pitch = 0.9 + random(-0.2, 0.4);
   currentUtterance.volume = 1;
   
   currentUtterance.onend = () => speakNextGlitchChar();
